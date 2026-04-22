@@ -6,14 +6,16 @@ export default function Login() {
   const redirect = params.get("redirect");
 
   return (
-    <div className="clerk-page">
-      <SignIn
-        routing="path"
-        path="/login"
-        forceRedirectUrl={redirect || undefined}
-        fallbackRedirectUrl="/dashboard"
-        signUpUrl="/signup"
-      />
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="w-full max-w-md p-6">
+        <SignIn
+          routing="path"
+          path="/login"
+          forceRedirectUrl={redirect || undefined}
+          fallbackRedirectUrl="/dashboard"
+          signUpUrl="/signup"
+        />
+      </div>
     </div>
   );
 }
