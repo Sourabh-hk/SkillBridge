@@ -88,17 +88,19 @@ async function getOrCreateClerkUser(u) {
 async function syncUserToDB(clerkUser, u) {
   const name = `${u.firstName} ${u.lastName}`;
   const email = clerkUser.emailAddresses?.[0]?.emailAddress || u.email;
+  const approvalStatus = u.role === "trainer" ? "pending" : "approved";
 
   await db.query(
-    `INSERT INTO users(clerk_user_id, name, email, role)
-     VALUES($1, $2, $3, $4)
+    `INSERT INTO users(clerk_user_id, name, email, role, approval_status)
+     VALUES($1, $2, $3, $4, $5)
      ON CONFLICT (clerk_user_id) DO UPDATE
        SET name  = EXCLUDED.name,
            email = EXCLUDED.email,
-           role  = EXCLUDED.role`,
-    [clerkUser.id, name, email, u.role]
+           role  = EXCLUDED.role,
+           approval_status = EXCLUDED.approval_status`,
+    [clerkUser.id, name, email, u.role, approvalStatus]
   );
-  console.log(`  → Synced to DB: ${email} as ${u.role}`);
+  console.log(`  → Synced to DB: ${email} as ${u.role} (${approvalStatus})`);
 }
 
 // ── Seed relationships ────────────────────────────────────────────────────────
@@ -180,6 +182,20 @@ async function main() {
     } catch (err) {
       console.error(`  ✗ Failed for ${u.email}:`, err.errors?.[0]?.message || err.message);
     }
+  }
+
+  const institutionRow = await db.query(
+    "SELECT id FROM users WHERE role='institution' LIMIT 1"
+  );
+  const trainerRow = await db.query(
+    "SELECT id FROM users WHERE role='trainer' LIMIT 1"
+  );
+  if (institutionRow.rows.length && trainerRow.rows.length) {
+    await db.query(
+      "UPDATE users SET institution_id=$1 WHERE id=$2",
+      [institutionRow.rows[0].id, trainerRow.rows[0].id]
+    );
+    console.log("  → Linked seeded trainer to seeded institution");
   }
 
   console.log("\n--- Seeding batch relationships ---");

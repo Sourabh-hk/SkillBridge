@@ -47,6 +47,7 @@ beforeAll(async () => {
     role: "trainer",
     name: "Test Trainer",
     email: `trainer_${ts}@test.dev`,
+    institution_id: institution.id,
   });
   student = await createTestUser({
     role: "student",

@@ -42,6 +42,12 @@ export const api = {
   // Auth
   syncUser: (body) => request("POST", "/auth/sync", body),
   me: () => request("GET", "/auth/me"),
+  getInstitutions: () => request("GET", "/auth/institutions"),
+  getApprovalRequests: () => request("GET", "/auth/requests"),
+  approveRequest: (id) => request("POST", `/auth/requests/${id}/approve`),
+  getUsers: (params = {}) => request("GET", `/auth/users${buildQuery(params)}`),
+  provisionUser: (body) => request("POST", "/auth/provision", body),
+  assignUserRole: (id, body) => request("POST", `/auth/users/${id}/assign-role`, body),
 
   // Batches  — returns { data, total, page, limit, totalPages }
   createBatch: (body) => request("POST", "/batches", body),

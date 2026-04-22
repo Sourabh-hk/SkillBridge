@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 import { ClerkProvider } from "@clerk/clerk-react";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -21,27 +21,37 @@ function PrivateRoute({ children }) {
   const { user, loading, needsOnboarding } = useAuth();
   if (loading) return <PageLoader />;
   if (needsOnboarding) return <Navigate to="/onboarding" />;
+  if (user && user.approval_status !== "approved") return <Navigate to="/onboarding" />;
   return user ? children : <Navigate to="/login" />;
 }
 
 function Navbar() {
   const { user, logout } = useAuth();
-  if (!user) return null;
   return (
-    <>
-      <nav className="flex items-center justify-between px-6 py-3 bg-white border-b">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-lg text-primary">SkillBridge</span>
-          <Separator orientation="vertical" className="h-5" />
+    <nav className="flex items-center justify-between px-6 py-3 bg-white border-b">
+      <div className="flex items-center gap-2">
+        <Link to="/" className="font-bold text-lg text-primary">
+          SkillBridge
+        </Link>
+        <Separator orientation="vertical" className="h-5" />
+        {user && (
           <span className="text-sm text-muted-foreground capitalize">
-            {user.name} · {user.role.replace("_", " ")}
+            {user.name} · {user.role.replace("_", " ")} · {user.approval_status}
           </span>
-        </div>
-        <Button variant="outline" size="sm" onClick={logout}>
-          Logout
-        </Button>
-      </nav>
-    </>
+        )}
+      </div>
+      <div>
+        {user ? (
+          <Button variant="outline" size="sm" onClick={logout}>
+            Logout
+          </Button>
+        ) : (
+          <Link to="/signup" className="text-sm text-muted-foreground hover:underline">
+            Sign up
+          </Link>
+        )}
+      </div>
+    </nav>
   );
 }
 

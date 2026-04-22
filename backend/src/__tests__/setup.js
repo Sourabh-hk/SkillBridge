@@ -16,16 +16,32 @@ const db = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+let approvalColumnEnsured = false;
+
+async function ensureApprovalColumn() {
+  if (approvalColumnEnsured) return;
+  await db.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20)
+    CHECK (approval_status IN ('pending', 'approved', 'rejected'))
+  `);
+  await db.query("UPDATE users SET approval_status='approved' WHERE approval_status IS NULL");
+  await db.query("ALTER TABLE users ALTER COLUMN approval_status SET DEFAULT 'pending'");
+  await db.query("ALTER TABLE users ALTER COLUMN approval_status SET NOT NULL");
+  approvalColumnEnsured = true;
+}
+
 /**
  * Insert a bare user row directly into the DB (no Clerk involved).
  * Returns the full row including `id`.
  */
-async function createTestUser({ role, name, email, institution_id = null }) {
+async function createTestUser({ role, name, email, institution_id = null, approval_status = "approved" }) {
+  await ensureApprovalColumn();
   const clerkId = `test_clerk_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const result = await db.query(
-    `INSERT INTO users(clerk_user_id, name, email, role, institution_id)
-     VALUES($1,$2,$3,$4,$5) RETURNING *`,
-    [clerkId, name, email, role, institution_id]
+    `INSERT INTO users(clerk_user_id, name, email, role, institution_id, approval_status)
+     VALUES($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [clerkId, name, email, role, institution_id, approval_status]
   );
   return result.rows[0];
 }

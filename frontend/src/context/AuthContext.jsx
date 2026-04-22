@@ -51,8 +51,8 @@ export function AuthProvider({ children }) {
    * Called from the Onboarding page after the user picks a role.
    * POSTs to /api/auth/sync and stores the resulting DB user.
    */
-  async function syncUser(role) {
-    const u = await api.syncUser({ role });
+  async function syncUser(role, institutionId = null) {
+    const u = await api.syncUser({ role, institution_id: institutionId });
     setDbUser(u);
     setNeedsOnboarding(false);
     return u;

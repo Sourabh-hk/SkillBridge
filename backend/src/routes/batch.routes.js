@@ -16,7 +16,13 @@ router.post(
       if (!name) return res.status(400).json({ msg: "Batch name required" });
 
       const institution_id =
-        req.user.role === "institution" ? req.user.id : null;
+        req.user.role === "institution" ? req.user.id : req.user.institution_id;
+
+      if (req.user.role === "trainer" && !institution_id) {
+        return res.status(400).json({
+          msg: "Trainer must be affiliated to an institution",
+        });
+      }
 
       const result = await db.query(
         "INSERT INTO batches(name, institution_id) VALUES($1,$2) RETURNING *",

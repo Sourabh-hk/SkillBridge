@@ -22,6 +22,7 @@ const CREATE_SQL = `
     email VARCHAR(255) UNIQUE NOT NULL,
     role VARCHAR(50) NOT NULL CHECK (role IN ('student','trainer','institution','programme_manager','monitoring_officer')),
     institution_id INTEGER REFERENCES users(id),
+    approval_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending','approved','rejected')),
     created_at TIMESTAMP DEFAULT NOW()
   );
 

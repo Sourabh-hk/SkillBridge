@@ -42,6 +42,20 @@ const verifyToken = async (req, res, next) => {
       });
     }
     req.user = result.rows[0];
+
+    // Only approved accounts can access protected resources.
+    // Keep /api/auth/me and approval-management endpoints available so clients
+    // can poll status and approvers can process requests.
+    const isAuthIntrospectionRoute =
+      req.baseUrl === "/api/auth" &&
+      (req.path === "/me" || req.path.startsWith("/requests"));
+
+    if (!isAuthIntrospectionRoute && req.user.approval_status !== "approved") {
+      return res.status(403).json({
+        msg: `Account ${req.user.approval_status}. Access will be enabled once approved.`,
+      });
+    }
+
     next();
   } catch (err) {
     console.error("verifyToken error:", err);

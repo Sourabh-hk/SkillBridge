@@ -16,6 +16,8 @@ export default function InstitutionDashboard() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [approving, setApproving] = useState({});
   const [trainers, setTrainers] = useState([]);
   const [trainerPag, setTrainerPag] = useState({ page: 1, totalPages: 1, total: 0 });
   const [batches, setBatches] = useState([]);
@@ -37,7 +39,33 @@ export default function InstitutionDashboard() {
     finally { setLoading(false); }
   }, [user]);
 
-  useEffect(() => { loadSummary(1); }, [loadSummary]);
+  const loadRequests = useCallback(async () => {
+    try {
+      const res = await api.getApprovalRequests();
+      setPendingRequests(res.data || []);
+    } catch (e) {
+      toast.error(e.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSummary(1);
+    loadRequests();
+  }, [loadSummary, loadRequests]);
+
+  async function handleApprove(requestId) {
+    if (approving[requestId]) return;
+    setApproving((prev) => ({ ...prev, [requestId]: true }));
+    try {
+      await api.approveRequest(requestId);
+      toast.success("Trainer approved");
+      await Promise.all([loadRequests(), loadSummary(1)]);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setApproving((prev) => ({ ...prev, [requestId]: false }));
+    }
+  }
 
   async function viewBatchSummary(batchId) {
     setBatchLoading((prev) => ({ ...prev, [batchId]: true }));
@@ -74,6 +102,48 @@ export default function InstitutionDashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Trainers */}
+      {pendingRequests.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">
+              Pending Trainer Approvals
+              {!loading && <span className="text-sm font-normal text-muted-foreground ml-2">({pendingRequests.length} pending)</span>}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Requested</TableHead>
+                  <TableHead>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingRequests.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell>{r.email}</TableCell>
+                    <TableCell>{r.created_at?.split("T")[0]}</TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        onClick={() => handleApprove(r.id)}
+                        disabled={!!approving[r.id]}
+                      >
+                        {approving[r.id] ? <Spinner size="sm" className="text-white" /> : "Approve"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Trainers */}
       <Card>
@@ -123,8 +193,7 @@ export default function InstitutionDashboard() {
             </TableHeader>
             <TableBody>
               {loading ? <TableLoader colSpan={3} /> : batches.length === 0 ? <TableEmpty colSpan={3} /> : batches.map((b) => (
-                <>
-                  <TableRow key={b.id}>
+                <TableRow key={b.id}>
                     <TableCell className="font-medium">{b.name}</TableCell>
                     <TableCell>{b.created_at?.split("T")[0]}</TableCell>
                     <TableCell>
@@ -136,44 +205,43 @@ export default function InstitutionDashboard() {
                         {batchLoading[b.id] ? <Spinner size="sm" /> : "View Summary"}
                       </Button>
                     </TableCell>
-                  </TableRow>
-                  {batchSummaries[b.id] && (
-                    <TableRow key={`${b.id}-summary`}>
-                      <TableCell colSpan={3} className="bg-muted/30 p-4">
-                        <p className="text-sm font-semibold mb-2">
-                          Total sessions: {batchSummaries[b.id].total_sessions}
-                        </p>
-                        {batchSummaries[b.id].students?.length > 0 ? (
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Student</TableHead>
-                                <TableHead>Present</TableHead>
-                                <TableHead>Absent</TableHead>
-                                <TableHead>Late</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {batchSummaries[b.id].students.map((s) => (
-                                <TableRow key={s.id}>
-                                  <TableCell>{s.name}</TableCell>
-                                  <TableCell className="text-green-600">{s.present}</TableCell>
-                                  <TableCell className="text-red-600">{s.absent}</TableCell>
-                                  <TableCell className="text-yellow-600">{s.late}</TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">No students enrolled.</p>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </>
+                </TableRow>
               ))}
             </TableBody>
           </Table>
+          {batches.map((b) => (
+            batchSummaries[b.id] ? (
+              <div key={`${b.id}-summary`} className="mt-3 rounded-md border bg-muted/30 p-4">
+                <p className="text-sm font-semibold mb-2">
+                  {b.name} - Total sessions: {batchSummaries[b.id].total_sessions}
+                </p>
+                {batchSummaries[b.id].students?.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Student</TableHead>
+                        <TableHead>Present</TableHead>
+                        <TableHead>Absent</TableHead>
+                        <TableHead>Late</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {batchSummaries[b.id].students.map((s) => (
+                        <TableRow key={s.id}>
+                          <TableCell>{s.name}</TableCell>
+                          <TableCell className="text-green-600">{s.present}</TableCell>
+                          <TableCell className="text-red-600">{s.absent}</TableCell>
+                          <TableCell className="text-yellow-600">{s.late}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No students enrolled.</p>
+                )}
+              </div>
+            ) : null
+          ))}
           <Pagination page={batchPag.page} totalPages={batchPag.totalPages} onPage={loadSummary} />
         </CardContent>
       </Card>
