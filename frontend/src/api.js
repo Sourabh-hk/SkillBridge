@@ -1,12 +1,18 @@
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
-function getToken() {
-  return localStorage.getItem("token");
+/**
+ * tokenGetter is set by AuthContext after Clerk initialises.
+ * It must return a Promise<string|null>.
+ */
+let tokenGetter = () => Promise.resolve(null);
+
+export function setTokenGetter(fn) {
+  tokenGetter = fn;
 }
 
 async function request(method, path, body) {
   const headers = { "Content-Type": "application/json" };
-  const token = getToken();
+  const token = await tokenGetter();
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const res = await fetch(`${BASE}${path}`, {
@@ -18,15 +24,16 @@ async function request(method, path, body) {
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error(data.msg || "Request failed");
+    const err = new Error(data.msg || "Request failed");
+    err.status = res.status;
+    throw err;
   }
   return data;
 }
 
 export const api = {
-  // Auth
-  signup: (body) => request("POST", "/auth/signup", body),
-  login: (body) => request("POST", "/auth/login", body),
+  // Auth — Clerk replaces signup/login; only sync + me remain
+  syncUser: (body) => request("POST", "/auth/sync", body),
   me: () => request("GET", "/auth/me"),
 
   // Batches
@@ -51,3 +58,4 @@ export const api = {
   // Programme
   getProgrammeSummary: () => request("GET", "/programme/summary"),
 };
+

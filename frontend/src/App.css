@@ -42,3 +42,70 @@ input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-s
 .error { color: #c0392b; font-size: 14px; margin-top: 8px; }
 .msg { color: #27ae60; font-size: 14px; margin-top: 8px; }
 
+/* Clerk SignIn / SignUp page wrapper — just centers the component */
+.clerk-page {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 60px;
+  min-height: calc(100vh - 48px);
+}
+
+/* Onboarding role-picker */
+.onboarding-page {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 60px 16px;
+  min-height: calc(100vh - 48px);
+}
+.onboarding-card {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  padding: 36px 32px;
+  width: 100%;
+  max-width: 640px;
+}
+.onboarding-card h2 { margin-bottom: 8px; font-size: 1.5rem; color: #1a1a2e; }
+.onboarding-subtitle { color: #555; margin-bottom: 28px; font-size: 0.95rem; }
+
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.role-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fafafa;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: center;
+}
+.role-card:hover { border-color: #1a1a2e; background: #f0f4ff; }
+.role-card--selected { border-color: #1a1a2e; background: #eef1ff; }
+.role-card__icon { font-size: 1.8rem; }
+.role-card__label { font-weight: 700; font-size: 0.9rem; color: #1a1a2e; }
+.role-card__desc { font-size: 0.75rem; color: #666; line-height: 1.4; }
+
+.onboarding-submit {
+  width: 100%;
+  padding: 12px;
+  background: #1a1a2e;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.onboarding-submit:hover { background: #2d2d5e; }
+.onboarding-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
