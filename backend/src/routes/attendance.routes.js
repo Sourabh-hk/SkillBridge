@@ -21,6 +21,32 @@ router.post(
         return res.status(400).json({ msg: "Invalid status" });
       }
 
+      // Fetch session details
+      // NOTE: Sessions store TIME WITHOUT TIME ZONE (local time entered by the trainer).
+      // The DB server (Neon) runs in UTC so a server-side NOW() comparison would be
+      // wrong for any non-UTC timezone. The time-window is enforced by the frontend
+      // using the browser's local clock, which is always correct.
+      const sessionResult = await db.query(
+        `SELECT s.id, s.batch_id FROM sessions s WHERE s.id = $1`,
+        [session_id]
+      );
+
+      if (sessionResult.rows.length === 0) {
+        return res.status(404).json({ msg: "Session not found" });
+      }
+
+      const session = sessionResult.rows[0];
+
+      // Check student is enrolled in the batch
+      const enrollCheck = await db.query(
+        `SELECT 1 FROM batch_students WHERE batch_id = $1 AND student_id = $2`,
+        [session.batch_id, req.user.id]
+      );
+
+      if (enrollCheck.rows.length === 0) {
+        return res.status(403).json({ msg: "You are not enrolled in this batch" });
+      }
+
       // Upsert attendance
       await db.query(
         `INSERT INTO attendance(session_id, student_id, status)

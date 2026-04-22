@@ -29,6 +29,15 @@ th { background: #f0f0f0; font-weight: 600; }
 
 button { padding: 6px 12px; background: #1a1a2e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 button:hover { opacity: 0.85; }
+button:disabled { cursor: not-allowed; }
+.btn-spinner {
+  display: inline-block; width: 12px; height: 12px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+}
 input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
 
 .stats-grid { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -41,6 +50,31 @@ input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-s
 
 .error { color: #c0392b; font-size: 14px; margin-top: 8px; }
 .msg { color: #27ae60; font-size: 14px; margin-top: 8px; }
+
+/* Loader */
+.loader-wrap { display: flex; justify-content: center; padding: 40px 0; }
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #1a1a2e;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Empty table state */
+.no-data-row td {
+  text-align: center; color: #999; padding: 20px;
+  font-style: italic; font-size: 13px;
+}
+
+/* Session window status badges */
+.session-upcoming { font-size: 12px; color: #888; background: #f0f0f0; padding: 3px 8px; border-radius: 4px; }
+.session-ended    { font-size: 12px; color: #aaa; background: #f7f7f7; padding: 3px 8px; border-radius: 4px; }
+.badge { font-size: 12px; padding: 3px 8px; border-radius: 4px; font-weight: 600; text-transform: capitalize; }
+.badge-present { background: #d4edda; color: #155724; }
+.badge-absent  { background: #f8d7da; color: #721c24; }
+.badge-late    { background: #fff3cd; color: #856404; }
 
 /* Clerk SignIn / SignUp page wrapper — just centers the component */
 .clerk-page {

@@ -16,7 +16,11 @@ if (!PUBLISHABLE_KEY) {
 
 function PrivateRoute({ children }) {
   const { user, loading, needsOnboarding } = useAuth();
-  if (loading) return <p style={{ padding: "20px" }}>Loading...</p>;
+  if (loading) return (
+    <div className="loader-wrap" style={{ minHeight: "80vh" }}>
+      <div className="spinner" />
+    </div>
+  );
   if (needsOnboarding) return <Navigate to="/onboarding" />;
   return user ? children : <Navigate to="/login" />;
 }

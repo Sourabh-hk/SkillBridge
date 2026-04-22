@@ -5,11 +5,15 @@ import { useAuth } from "../../context/AuthContext";
 export default function ProgrammeManagerDashboard() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [batchSummaries, setBatchSummaries] = useState({});
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api.getProgrammeSummary().then(setData).catch((e) => setError(e.message));
+    api.getProgrammeSummary()
+      .then(setData)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
   }, []);
 
   async function viewBatchSummary(batchId) {
@@ -27,17 +31,21 @@ export default function ProgrammeManagerDashboard() {
       <p>Welcome, {user?.name}</p>
       {error && <p className="error">{error}</p>}
 
-      {data && (
+      {loading ? (
+        <div className="loader-wrap"><div className="spinner" /></div>
+      ) : !data ? (
+        <p className="error">Could not load programme data.</p>
+      ) : (
         <>
           <section>
             <h3>Programme Overview</h3>
             <div className="stats-grid">
-              <div className="stat-card"><strong>{data.stats?.total_batches}</strong><span>Batches</span></div>
-              <div className="stat-card"><strong>{data.stats?.total_sessions}</strong><span>Sessions</span></div>
-              <div className="stat-card"><strong>{data.stats?.total_students}</strong><span>Students</span></div>
-              <div className="stat-card"><strong>{data.stats?.total_trainers}</strong><span>Trainers</span></div>
-              <div className="stat-card"><strong>{data.stats?.total_present}</strong><span>Present</span></div>
-              <div className="stat-card"><strong>{data.stats?.total_absent}</strong><span>Absent</span></div>
+              <div className="stat-card"><strong>{data.stats?.total_batches ?? 0}</strong><span>Batches</span></div>
+              <div className="stat-card"><strong>{data.stats?.total_sessions ?? 0}</strong><span>Sessions</span></div>
+              <div className="stat-card"><strong>{data.stats?.total_students ?? 0}</strong><span>Students</span></div>
+              <div className="stat-card"><strong>{data.stats?.total_trainers ?? 0}</strong><span>Trainers</span></div>
+              <div className="stat-card"><strong>{data.stats?.total_present ?? 0}</strong><span>Present</span></div>
+              <div className="stat-card"><strong>{data.stats?.total_absent ?? 0}</strong><span>Absent</span></div>
             </div>
           </section>
 
@@ -48,7 +56,9 @@ export default function ProgrammeManagerDashboard() {
                 <tr><th>Name</th><th>Batches</th><th>Sessions</th><th>Students</th></tr>
               </thead>
               <tbody>
-                {data.institutions?.map((inst) => (
+                {!data.institutions?.length ? (
+                  <tr className="no-data-row"><td colSpan={4}>No data available</td></tr>
+                ) : data.institutions.map((inst) => (
                   <tr key={inst.id}>
                     <td>{inst.name}</td>
                     <td>{inst.batches}</td>
@@ -64,3 +74,4 @@ export default function ProgrammeManagerDashboard() {
     </div>
   );
 }
+
