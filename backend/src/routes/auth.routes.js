@@ -1,92 +1,96 @@
 const express = require("express");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
 const { db } = require("../config/db");
 const { verifyToken } = require("../middleware/auth");
 
 const router = express.Router();
 
-const VALID_ROLES = ["student", "trainer", "institution", "programme_manager", "monitoring_officer"];
+const VALID_ROLES = [
+  "student",
+  "trainer",
+  "institution",
+  "programme_manager",
+  "monitoring_officer",
+];
 
-// SIGNUP
-router.post("/signup", async (req, res) => {
+/**
+ * POST /api/auth/sync
+ * Called by the frontend immediately after Clerk sign-up/sign-in to create
+ * (or return) the user record in our database.
+ *
+ * Body: { role, institution_id? }
+ * Auth: Clerk session token in Authorization header (handled by clerkMiddleware)
+ */
+router.post("/sync", async (req, res) => {
   try {
-    const { name, email, password, role, institution_id } = req.body;
+    let userId;
 
-    if (!name || !email || !password || !role) {
-      return res.status(400).json({ msg: "All fields are required" });
+    if (process.env.NODE_ENV === "test") {
+      // Test mode: caller passes clerk_user_id directly
+      userId = req.headers["x-clerk-user-id"] || req.body.clerk_user_id;
+      if (!userId) {
+        return res.status(400).json({ msg: "clerk_user_id required in test mode" });
+      }
+    } else {
+      const { getAuth } = require("@clerk/express");
+      const auth = getAuth(req);
+      userId = auth.userId;
+      if (!userId) return res.status(401).json({ msg: "Unauthorized" });
     }
 
-    if (!VALID_ROLES.includes(role)) {
-      return res.status(400).json({ msg: "Invalid role" });
+    const { role, institution_id, name, email } = req.body;
+
+    if (!role || !VALID_ROLES.includes(role)) {
+      return res.status(400).json({ msg: `Valid role required: ${VALID_ROLES.join(", ")}` });
     }
 
-    const existing = await db.query("SELECT id FROM users WHERE email=$1", [email]);
+    // Return existing user if already synced
+    const existing = await db.query(
+      "SELECT id, clerk_user_id, name, email, role, institution_id, created_at FROM users WHERE clerk_user_id=$1",
+      [userId]
+    );
     if (existing.rows.length > 0) {
-      return res.status(400).json({ msg: "Email already registered" });
+      return res.json(existing.rows[0]);
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // In production fetch user details from Clerk; in test use body values
+    let userName = name;
+    let userEmail = email;
+
+    if (process.env.NODE_ENV !== "test") {
+      const { createClerkClient } = require("@clerk/backend");
+      const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+      const clerkUser = await clerk.users.getUser(userId);
+      userEmail = clerkUser.emailAddresses[0]?.emailAddress || "";
+      userName =
+        `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() ||
+        userEmail;
+    }
+
+    if (!userName || !userEmail) {
+      return res.status(400).json({ msg: "name and email are required" });
+    }
 
     const result = await db.query(
-      "INSERT INTO users(name, email, password, role, institution_id) VALUES($1,$2,$3,$4,$5) RETURNING id, name, email, role",
-      [name, email, hashedPassword, role, institution_id || null]
+      `INSERT INTO users(clerk_user_id, name, email, role, institution_id)
+       VALUES($1,$2,$3,$4,$5)
+       RETURNING id, clerk_user_id, name, email, role, institution_id, created_at`,
+      [userId, userName, userEmail, role, institution_id || null]
     );
 
-    const user = result.rows[0];
-    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "7d" });
-
-    res.status(201).json({ token, user });
+    res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: "Error creating user" });
+    console.error("sync error:", err);
+    res.status(500).json({ msg: "Error syncing user" });
   }
 });
 
-// LOGIN
-router.post("/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ msg: "Email and password required" });
-    }
-
-    const result = await db.query("SELECT * FROM users WHERE email=$1", [email]);
-
-    if (result.rows.length === 0) {
-      return res.status(400).json({ msg: "User not found" });
-    }
-
-    const user = result.rows[0];
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      return res.status(400).json({ msg: "Invalid credentials" });
-    }
-
-    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "7d" });
-
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, institution_id: user.institution_id } });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: "Login error" });
-  }
-});
-
-// GET current user
-router.get("/me", verifyToken, async (req, res) => {
-  try {
-    const result = await db.query(
-      "SELECT id, name, email, role, institution_id, created_at FROM users WHERE id=$1",
-      [req.user.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ msg: "User not found" });
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: "Error fetching user" });
-  }
+/**
+ * GET /api/auth/me
+ * Returns the authenticated user's profile from our database.
+ */
+router.get("/me", verifyToken, (req, res) => {
+  const { id, clerk_user_id, name, email, role, institution_id, created_at } = req.user;
+  res.json({ id, clerk_user_id, name, email, role, institution_id, created_at });
 });
 
 module.exports = router;
