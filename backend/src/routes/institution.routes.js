@@ -4,7 +4,7 @@ const router = express.Router();
 const { db } = require("../config/db");
 const { verifyToken, authorize } = require("../middleware/auth");
 
-// GET /institutions/:id/summary — Institution summary
+// GET /institutions/:id/summary — Institution summary (paginated sub-lists)
 router.get(
   "/:id/summary",
   verifyToken,
@@ -12,6 +12,9 @@ router.get(
   async (req, res) => {
     try {
       const institutionId = req.params.id;
+      const page = Math.max(1, parseInt(req.query.page) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
+      const offset = (page - 1) * limit;
 
       const institutionResult = await db.query(
         "SELECT id, name, email FROM users WHERE id=$1 AND role='institution'",
@@ -22,18 +25,32 @@ router.get(
         return res.status(404).json({ msg: "Institution not found" });
       }
 
-      const batchesResult = await db.query(
-        "SELECT * FROM batches WHERE institution_id=$1",
+      const batchCountResult = await db.query(
+        "SELECT COUNT(*) FROM batches WHERE institution_id=$1",
         [institutionId]
       );
+      const batchTotal = parseInt(batchCountResult.rows[0].count);
+      const batchesResult = await db.query(
+        "SELECT * FROM batches WHERE institution_id=$1 LIMIT $2 OFFSET $3",
+        [institutionId, limit, offset]
+      );
 
-      const trainersResult = await db.query(
-        `SELECT DISTINCT u.id, u.name, u.email
+      const trainerCountResult = await db.query(
+        `SELECT COUNT(DISTINCT u.id)
          FROM batch_trainers bt
          JOIN batches b ON bt.batch_id = b.id
          JOIN users u ON bt.trainer_id = u.id
          WHERE b.institution_id=$1`,
         [institutionId]
+      );
+      const trainerTotal = parseInt(trainerCountResult.rows[0].count);
+      const trainersResult = await db.query(
+        `SELECT DISTINCT u.id, u.name, u.email
+         FROM batch_trainers bt
+         JOIN batches b ON bt.batch_id = b.id
+         JOIN users u ON bt.trainer_id = u.id
+         WHERE b.institution_id=$1 LIMIT $2 OFFSET $3`,
+        [institutionId, limit, offset]
       );
 
       const statsResult = await db.query(
@@ -53,8 +70,8 @@ router.get(
 
       res.json({
         institution: institutionResult.rows[0],
-        batches: batchesResult.rows,
-        trainers: trainersResult.rows,
+        batches: { data: batchesResult.rows, total: batchTotal, page, limit, totalPages: Math.ceil(batchTotal / limit) },
+        trainers: { data: trainersResult.rows, total: trainerTotal, page, limit, totalPages: Math.ceil(trainerTotal / limit) },
         stats: statsResult.rows[0],
       });
     } catch (err) {

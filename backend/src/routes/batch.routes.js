@@ -43,34 +43,61 @@ router.post(
 // GET /batches — List batches (role-scoped)
 router.get("/", verifyToken, async (req, res) => {
   try {
-    let result;
     const { role, id } = req.user;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
+    const offset = (page - 1) * limit;
+
+    let rows, total;
 
     if (role === "trainer") {
-      result = await db.query(
+      const countResult = await db.query(
+        "SELECT COUNT(*) FROM batches b JOIN batch_trainers bt ON b.id = bt.batch_id WHERE bt.trainer_id = $1",
+        [id]
+      );
+      total = parseInt(countResult.rows[0].count);
+      const result = await db.query(
         `SELECT b.* FROM batches b
          JOIN batch_trainers bt ON b.id = bt.batch_id
-         WHERE bt.trainer_id = $1`,
+         WHERE bt.trainer_id = $1 LIMIT $2 OFFSET $3`,
+        [id, limit, offset]
+      );
+      rows = result.rows;
+    } else if (role === "student") {
+      const countResult = await db.query(
+        "SELECT COUNT(*) FROM batches b JOIN batch_students bs ON b.id = bs.batch_id WHERE bs.student_id = $1",
         [id]
       );
-    } else if (role === "student") {
-      result = await db.query(
+      total = parseInt(countResult.rows[0].count);
+      const result = await db.query(
         `SELECT b.* FROM batches b
          JOIN batch_students bs ON b.id = bs.batch_id
-         WHERE bs.student_id = $1`,
-        [id]
+         WHERE bs.student_id = $1 LIMIT $2 OFFSET $3`,
+        [id, limit, offset]
       );
+      rows = result.rows;
     } else if (role === "institution") {
-      result = await db.query(
-        "SELECT * FROM batches WHERE institution_id = $1",
+      const countResult = await db.query(
+        "SELECT COUNT(*) FROM batches WHERE institution_id = $1",
         [id]
       );
+      total = parseInt(countResult.rows[0].count);
+      const result = await db.query(
+        "SELECT * FROM batches WHERE institution_id = $1 LIMIT $2 OFFSET $3",
+        [id, limit, offset]
+      );
+      rows = result.rows;
     } else {
-      // programme_manager, monitoring_officer
-      result = await db.query("SELECT * FROM batches ORDER BY created_at DESC");
+      const countResult = await db.query("SELECT COUNT(*) FROM batches");
+      total = parseInt(countResult.rows[0].count);
+      const result = await db.query(
+        "SELECT * FROM batches ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+        [limit, offset]
+      );
+      rows = result.rows;
     }
 
-    res.json(result.rows);
+    res.json({ data: rows, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Error fetching batches" });

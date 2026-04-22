@@ -1,20 +1,28 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { toast } from "sonner";
 import { api } from "../../api";
 import { useAuth } from "../../context/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Pagination } from "@/components/ui/pagination";
+import { Spinner, TableLoader, TableEmpty } from "@/components/ui/spinner";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+
+const PAGE_SIZE = 10;
 
 /** Returns 'active' | 'upcoming' | 'ended' based on current local time vs session window */
 function getSessionWindowStatus(s) {
   const now = new Date();
-  // s.date is a plain "YYYY-MM-DD" string (pg type-parser set to string).
-  // s.start_time / s.end_time are plain "HH:MM:SS" strings.
-  // Slice to 5 chars ("HH:MM") ensures no microsecond suffix causes Invalid Date.
   const dateStr = (s.date ?? "").split("T")[0];
   const startStr = (s.start_time ?? "").slice(0, 8);
   const endStr   = (s.end_time   ?? "").slice(0, 8);
   if (!dateStr || !startStr || !endStr) return "unknown";
   const start = new Date(`${dateStr}T${startStr}`);
   const end   = new Date(`${dateStr}T${endStr}`);
-  // Guard against Invalid Date (bad data) — treat as unknown rather than falsely "active"
   if (isNaN(start.getTime()) || isNaN(end.getTime())) return "unknown";
   if (now < start) return "upcoming";
   if (now > end)   return "ended";
@@ -24,66 +32,55 @@ function getSessionWindowStatus(s) {
 export default function StudentDashboard() {
   const { user } = useAuth();
   const [sessions, setSessions] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
   const [joinToken, setJoinToken] = useState("");
-  const [joinMsg, setJoinMsg] = useState("");
   const [joinLoading, setJoinLoading] = useState(false);
-  const [markMsg, setMarkMsg] = useState({});
-  const [marking, setMarking] = useState({}); // { [sessionId]: status } — drives spinner UI
-  const markingRef = useRef({});              // synchronous guard — prevents double-fire
-  const [error, setError] = useState("");
+  const [marking, setMarking] = useState({});
+  const markingRef = useRef({});
 
-  useEffect(() => {
-    api.getSessions()
-      .then(setSessions)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+  const loadSessions = useCallback(async (page = 1) => {
+    setLoading(true);
+    try {
+      const res = await api.getSessions({ page, limit: PAGE_SIZE });
+      setSessions(res.data);
+      setPagination({ page: res.page, totalPages: res.totalPages, total: res.total });
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { loadSessions(1); }, [loadSessions]);
 
   async function handleJoin(e) {
     e.preventDefault();
-    setJoinMsg("");
     setJoinLoading(true);
     try {
       const data = await api.joinBatchByToken(joinToken);
-      setJoinMsg(data.msg + (data.batch ? ` — ${data.batch.name}` : ""));
+      toast.success(data.msg + (data.batch ? ` — ${data.batch.name}` : ""));
       setJoinToken("");
-      const updated = await api.getSessions();
-      setSessions(updated);
+      loadSessions(1);
     } catch (err) {
-      setJoinMsg(err.message);
+      toast.error(err.message);
     } finally {
       setJoinLoading(false);
     }
   }
 
   async function handleMark(sessionId, status) {
-    // Ref-based guard is synchronous — blocks double-clicks even before re-render
     if (markingRef.current[sessionId]) return;
     markingRef.current[sessionId] = status;
     setMarking((m) => ({ ...m, [sessionId]: status }));
-    setMarkMsg((m) => { const n = { ...m }; delete n[sessionId]; return n; });
     try {
       await api.markAttendance({ session_id: sessionId, status });
-
-      // Optimistically update local session state immediately so the badge
-      // appears even if the background getSessions() call fails.
       setSessions((prev) =>
-        prev.map((s) =>
-          s.id === sessionId ? { ...s, my_attendance: status } : s
-        )
+        prev.map((s) => s.id === sessionId ? { ...s, my_attendance: status } : s)
       );
-
-      // Background refresh to sync any other changes
-      api.getSessions().then(setSessions).catch(() => {});
-
-      setMarkMsg((m) => ({ ...m, [sessionId]: { text: "Marked: " + status, isError: false } }));
-      // Clear success message after 3 s — badge from my_attendance will take over
-      setTimeout(() => {
-        setMarkMsg((m) => { const n = { ...m }; delete n[sessionId]; return n; });
-      }, 3000);
+      toast.success(`Marked as ${status}`);
     } catch (err) {
-      setMarkMsg((m) => ({ ...m, [sessionId]: { text: err.message, isError: true } }));
+      toast.error(err.message);
     } finally {
       delete markingRef.current[sessionId];
       setMarking((m) => { const n = { ...m }; delete n[sessionId]; return n; });
@@ -91,102 +88,114 @@ export default function StudentDashboard() {
   }
 
   function renderActionCell(s) {
-    const msg = markMsg[s.id];
-    if (msg) {
-      return <span className={msg.isError ? "error" : "msg"}>{msg.text}</span>;
-    }
     if (s.my_attendance) {
-      return (
-        <span className={`badge badge-${s.my_attendance}`}>{s.my_attendance}</span>
-      );
+      return <Badge variant={s.my_attendance}>{s.my_attendance}</Badge>;
     }
     const winStatus = getSessionWindowStatus(s);
     if (winStatus === "active") {
       const busy = marking[s.id];
       return (
-        <span style={{ display: "flex", gap: 4 }}>
+        <div className="flex gap-1.5">
           {["present", "late", "absent"].map((st) => (
-            <button
+            <Button
               key={st}
+              size="sm"
+              variant={st === "absent" ? "destructive" : st === "late" ? "secondary" : "default"}
               onClick={() => handleMark(s.id, st)}
               disabled={!!busy}
-              style={{ opacity: busy && busy !== st ? 0.5 : 1, minWidth: 64 }}
+              className="min-w-16"
             >
-              {busy === st
-                ? <span className="btn-spinner" />
-                : st.charAt(0).toUpperCase() + st.slice(1)}
-            </button>
+              {busy === st ? <Spinner size="sm" className="text-white" /> : st.charAt(0).toUpperCase() + st.slice(1)}
+            </Button>
           ))}
-        </span>
+        </div>
       );
     }
-    if (winStatus === "upcoming") {
-      return <span className="session-upcoming">Not started yet</span>;
-    }
-    return <span className="session-ended">Session ended</span>;
+    if (winStatus === "upcoming") return <Badge variant="upcoming">Not started yet</Badge>;
+    return <Badge variant="ended">Session ended</Badge>;
   }
 
   return (
-    <div className="dashboard">
-      <h2>Student Dashboard</h2>
-      <p>Welcome, {user?.name}</p>
+    <div className="max-w-5xl mx-auto p-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Student Dashboard</h1>
+        <p className="text-muted-foreground">Welcome, {user?.name}</p>
+      </div>
 
-      <section>
-        <h3>Join a Batch</h3>
-        <form onSubmit={handleJoin} style={{ display: "flex", gap: 8 }}>
-          <input
-            placeholder="Paste invite token"
-            value={joinToken}
-            onChange={(e) => setJoinToken(e.target.value)}
-            disabled={joinLoading}
-            required
-          />
-          <button type="submit" disabled={joinLoading}>
-            {joinLoading ? <span className="btn-spinner" /> : "Join"}
-          </button>
-        </form>
-        {joinMsg && <p className="msg">{joinMsg}</p>}
-      </section>
+      {/* Join Batch */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Join a Batch</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleJoin} className="flex gap-2">
+            <Input
+              placeholder="Paste invite token"
+              value={joinToken}
+              onChange={(e) => setJoinToken(e.target.value)}
+              disabled={joinLoading}
+              required
+              className="max-w-sm"
+            />
+            <Button type="submit" disabled={joinLoading}>
+              {joinLoading ? <><Spinner size="sm" className="mr-2 text-white" />Joining…</> : "Join"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
-      <section>
-        <h3>My Sessions</h3>
-        {error && <p className="error">{error}</p>}
-        {loading ? (
-          <div className="loader-wrap"><div className="spinner" /></div>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Title</th>
-                <th>Batch</th>
-                <th>Date</th>
-                <th>Time</th>
-                <th>Your Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sessions.length === 0 ? (
-                <tr className="no-data-row"><td colSpan={6}>No data available</td></tr>
+      {/* My Sessions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">
+            My Sessions
+            {!loading && <span className="text-sm font-normal text-muted-foreground ml-2">({pagination.total} total)</span>}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Title</TableHead>
+                <TableHead>Batch</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Time</TableHead>
+                <TableHead>Your Status</TableHead>
+                <TableHead>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableLoader colSpan={6} />
+              ) : sessions.length === 0 ? (
+                <TableEmpty colSpan={6} />
               ) : sessions.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.title}</td>
-                  <td>{s.batch_name}</td>
-                  <td>{s.date?.split("T")[0]}</td>
-                  <td>{s.start_time?.slice(0, 5)} – {s.end_time?.slice(0, 5)}</td>
-                  <td>
+                <TableRow key={s.id}>
+                  <TableCell className="font-medium">{s.title}</TableCell>
+                  <TableCell>{s.batch_name}</TableCell>
+                  <TableCell>{s.date?.split("T")[0]}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {s.start_time?.slice(0, 5)} – {s.end_time?.slice(0, 5)}
+                  </TableCell>
+                  <TableCell>
                     {s.my_attendance
-                      ? <span className={`badge badge-${s.my_attendance}`}>{s.my_attendance}</span>
-                      : "—"}
-                  </td>
-                  <td>{renderActionCell(s)}</td>
-                </tr>
+                      ? <Badge variant={s.my_attendance}>{s.my_attendance}</Badge>
+                      : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell>{renderActionCell(s)}</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+            </TableBody>
+          </Table>
+          <Pagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            onPage={(p) => loadSessions(p)}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }
+
 

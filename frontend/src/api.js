@@ -31,31 +31,41 @@ async function request(method, path, body) {
   return data;
 }
 
+function buildQuery(params = {}) {
+  const q = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v != null) q.set(k, v); });
+  const str = q.toString();
+  return str ? `?${str}` : "";
+}
+
 export const api = {
-  // Auth — Clerk replaces signup/login; only sync + me remain
+  // Auth
   syncUser: (body) => request("POST", "/auth/sync", body),
   me: () => request("GET", "/auth/me"),
 
-  // Batches
+  // Batches  — returns { data, total, page, limit, totalPages }
   createBatch: (body) => request("POST", "/batches", body),
-  getBatches: () => request("GET", "/batches"),
+  getBatches: ({ page = 1, limit = 10 } = {}) => request("GET", `/batches${buildQuery({ page, limit })}`),
   generateInvite: (id) => request("POST", `/batches/${id}/invite`),
   joinBatchById: (id) => request("POST", `/batches/${id}/join`),
   joinBatchByToken: (token) => request("POST", "/batches/join-by-token", { token }),
   getBatchSummary: (id) => request("GET", `/batches/${id}/summary`),
 
-  // Sessions
+  // Sessions — returns { data, total, page, limit, totalPages }
   createSession: (body) => request("POST", "/sessions", body),
-  getSessions: () => request("GET", "/sessions"),
-  getSessionAttendance: (id) => request("GET", `/sessions/${id}/attendance`),
+  getSessions: ({ page = 1, limit = 10 } = {}) => request("GET", `/sessions${buildQuery({ page, limit })}`),
+  getSessionAttendance: (id, { page = 1, limit = 10 } = {}) =>
+    request("GET", `/sessions/${id}/attendance${buildQuery({ page, limit })}`),
 
   // Attendance
   markAttendance: (body) => request("POST", "/attendance/mark", body),
 
-  // Institution
-  getInstitutionSummary: (id) => request("GET", `/institutions/${id}/summary`),
+  // Institution — returns { institution, batches: { data, ... }, trainers: { data, ... }, stats }
+  getInstitutionSummary: (id, { page = 1, limit = 10 } = {}) =>
+    request("GET", `/institutions/${id}/summary${buildQuery({ page, limit })}`),
 
-  // Programme
-  getProgrammeSummary: () => request("GET", "/programme/summary"),
+  // Programme — returns { stats, institutions: { data, total, ... } }
+  getProgrammeSummary: ({ page = 1, limit = 10 } = {}) =>
+    request("GET", `/programme/summary${buildQuery({ page, limit })}`),
 };
 

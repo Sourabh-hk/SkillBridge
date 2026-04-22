@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
+import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { Spinner } from "@/components/ui/spinner";
 
 const ROLES = [
   { value: "student", label: "Student", icon: "🎓", desc: "View sessions and mark attendance" },
@@ -17,15 +22,12 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const [role, setRole] = useState("student");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  // Already synced — skip onboarding
   if (isLoaded && isSignedIn && !needsOnboarding) {
     navigate("/dashboard");
     return null;
   }
 
-  // Not signed in via Clerk at all
   if (isLoaded && !isSignedIn) {
     navigate("/signup");
     return null;
@@ -33,49 +35,58 @@ export default function Onboarding() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setError("");
     setLoading(true);
     try {
       await syncUser(role);
       navigate("/dashboard");
     } catch (err) {
-      setError(err.message || "Failed to set role. Please try again.");
+      toast.error(err.message || "Failed to set role. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="onboarding-page">
-      <div className="onboarding-card">
-        <h2>Welcome to SkillBridge</h2>
-        <p className="onboarding-subtitle">
-          Choose your role to complete setup. This <strong>cannot be changed</strong> later.
-        </p>
+    <div className="flex min-h-screen items-start justify-center px-4 pt-16 bg-muted/30">
+      <Card className="w-full max-w-2xl">
+        <CardHeader>
+          <CardTitle className="text-2xl">Welcome to SkillBridge</CardTitle>
+          <CardDescription>
+            Choose your role to complete setup. This <strong>cannot be changed</strong> later.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {ROLES.map((r) => (
+                <button
+                  key={r.value}
+                  type="button"
+                  onClick={() => setRole(r.value)}
+                  className={cn(
+                    "flex flex-col items-center gap-1.5 rounded-lg border-2 p-4 text-center transition-colors hover:border-primary hover:bg-accent",
+                    role === r.value
+                      ? "border-primary bg-primary/5"
+                      : "border-border bg-background"
+                  )}
+                >
+                  <span className="text-2xl">{r.icon}</span>
+                  <span className="font-semibold text-sm">{r.label}</span>
+                  <span className="text-xs text-muted-foreground leading-snug">{r.desc}</span>
+                </button>
+              ))}
+            </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="role-grid">
-            {ROLES.map((r) => (
-              <button
-                key={r.value}
-                type="button"
-                className={`role-card${role === r.value ? " role-card--selected" : ""}`}
-                onClick={() => setRole(r.value)}
-              >
-                <span className="role-card__icon">{r.icon}</span>
-                <span className="role-card__label">{r.label}</span>
-                <span className="role-card__desc">{r.desc}</span>
-              </button>
-            ))}
-          </div>
-
-          {error && <p className="error" style={{ marginTop: "1rem" }}>{error}</p>}
-
-          <button type="submit" className="onboarding-submit" disabled={loading}>
-            {loading ? "Setting up…" : `Continue as ${ROLES.find((r) => r.value === role)?.label}`}
-          </button>
-        </form>
-      </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (
+                <><Spinner size="sm" className="mr-2 text-white" /> Setting up…</>
+              ) : (
+                `Continue as ${ROLES.find((r) => r.value === role)?.label}`
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
