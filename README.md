@@ -8,9 +8,9 @@ A full-stack attendance management system for a fictional state-level skilling p
 
 | Service  | URL |
 |----------|-----|
-| Frontend | _Add Vercel URL after deployment_ |
-| Backend  | _Add Railway / Render URL after deployment_ |
-| API base | `<backend-url>/api` |
+| Frontend | [https://skill-bridge-mocha-theta.vercel.app/](https://skill-bridge-mocha-theta.vercel.app/) |
+| Backend  | [https://skillbridge-production-6f33.up.railway.app/](https://skillbridge-production-6f33.up.railway.app/)|
+| API base | [https://skillbridge-production-6f33.up.railway.app/api](https://skillbridge-production-6f33.up.railway.app/api) |
 
 ---
 
