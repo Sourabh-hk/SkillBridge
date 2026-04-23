@@ -36,3 +36,13 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+/* Center Clerk auth widgets (signup / login) */
+@layer components {
+  .clerk-page {
+    @apply min-h-screen flex items-center justify-center p-6 bg-slate-50;
+  }
+  .clerk-page > * {
+    @apply w-full max-w-md;
+  }
+}
