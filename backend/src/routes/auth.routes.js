@@ -12,7 +12,7 @@ const VALID_ROLES = [
   "monitoring_officer",
 ];
 
-const INSTITUTION_SCOPED_ROLES = ["student", "trainer"];
+const INSTITUTION_SCOPED_ROLES = ["trainer"];
 
 // GET /api/auth/institutions — public list for trainer onboarding
 router.get("/institutions", async (_req, res) => {
@@ -92,7 +92,7 @@ router.post("/sync", async (req, res) => {
     }
 
     let normalizedInstitutionId = institution_id || null;
-    const approvalStatus = "pending";
+    const approvalStatus = role === "student" ? "approved" : "pending";
 
     if (INSTITUTION_SCOPED_ROLES.includes(role)) {
       if (!normalizedInstitutionId) {

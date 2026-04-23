@@ -30,11 +30,11 @@ Higher-level roles are intentionally not self-selectable during onboarding.
 ## Hierarchy Model (Recruiter Demo)
 
 - All roles can choose their role at signup.
-- Every signup request starts as `pending` and needs approval by the higher authority.
+- Students are auto-approved upon registration. All other roles start as `pending` and need approval by the higher authority.
 
 Approval matrix:
 
-- Student -> approved by Institution (must choose institution on signup)
+- Student -> **auto-approved** (must choose institution on signup)
 - Trainer -> approved by Institution (must choose institution on signup)
 - Institution -> approved by Programme Manager
 - Monitoring Officer -> approved by Programme Manager
@@ -50,8 +50,8 @@ Scope model:
 
 1. Signup as Institution and Programme Manager (both become pending).
 2. Login as an already approved Programme Manager account and approve pending Institution/PM/Monitoring requests.
-3. Signup as Trainer (select institution) and Student (select institution) to create pending institution-scoped requests.
-4. Login as approved Institution account and approve pending Student/Trainer requests.
+3. Signup as Trainer (select institution) to create pending institution-scoped request. Signup as Student (select institution) - student is **auto-approved**.
+4. Login as approved Institution account and approve pending Trainer requests.
 5. Login as approved Trainer and show batch/session creation.
 6. Login as approved Monitoring Officer and show read-only programme view.
 

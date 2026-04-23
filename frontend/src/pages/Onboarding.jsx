@@ -10,18 +10,18 @@ import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 
 const ROLES = [
-  { value: "student", label: "Student", icon: "🎓", desc: "Requires institution approval" },
+  { value: "student", label: "Student", icon: "🎓", desc: "Auto-approved on signup" },
   { value: "trainer", label: "Trainer", icon: "🧑‍🏫", desc: "Requires institution approval" },
   { value: "institution", label: "Institution", icon: "🏫", desc: "Requires programme manager approval" },
   { value: "programme_manager", label: "Programme Manager", icon: "📋", desc: "Requires programme manager approval" },
   { value: "monitoring_officer", label: "Monitoring Officer", icon: "👁️", desc: "Requires programme manager approval" },
 ];
 
-const INSTITUTION_SCOPED_ROLES = ["student", "trainer"];
+const INSTITUTION_SCOPED_ROLES = ["trainer"];
 
 export default function Onboarding() {
   const { isLoaded, isSignedIn } = useUser();
-  const { user, syncUser, needsOnboarding } = useAuth();
+  const { user, syncUser, needsOnboarding, logout } = useAuth();
   const navigate = useNavigate();
   const [role, setRole] = useState("student");
   const [institutionId, setInstitutionId] = useState("");
@@ -96,14 +96,21 @@ export default function Onboarding() {
       <div className="flex min-h-screen items-start justify-center px-4 pt-16 bg-muted/30">
         <Card className="w-full max-w-xl">
           <CardHeader>
-            <CardTitle className="text-2xl">
-              {isPending ? "Approval Pending" : "Access Restricted"}
-            </CardTitle>
-            <CardDescription>
-              {isPending
-                ? "Your account request is waiting for approval from the hierarchy above your role."
-                : "Your access request was rejected. Contact your administrator for next steps."}
-            </CardDescription>
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle className="text-2xl">
+                  {isPending ? "Approval Pending" : "Access Restricted"}
+                </CardTitle>
+                <CardDescription>
+                  {isPending
+                    ? "Your account request is waiting for approval from the hierarchy above your role."
+                    : "Your access request was rejected. Contact your administrator for next steps."}
+                </CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={logout}>
+                Logout
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <p><strong>Name:</strong> {user.name}</p>
@@ -127,10 +134,17 @@ export default function Onboarding() {
     <div className="flex min-h-screen items-start justify-center px-4 pt-16 bg-muted/30">
       <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle className="text-2xl">Welcome to SkillBridge</CardTitle>
-          <CardDescription>
-            Choose your role to complete setup. Higher-level roles are assigned through approval, not self-signup.
-          </CardDescription>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="text-2xl">Welcome to SkillBridge</CardTitle>
+              <CardDescription>
+                Choose your role to complete setup. Higher-level roles are assigned through approval, not self-signup.
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={logout}>
+              Logout
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
